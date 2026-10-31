@@ -12479,7 +12479,8 @@ select.NB-feed-folder-picker-select {
 
 .NB-media-player-play-pause,
 .NB-media-player-skip-back,
-.NB-media-player-skip-forward {
+.NB-media-player-skip-forward,
+.NB-media-player-next {
     width: 26px;
     height: 26px;
     cursor: pointer;
@@ -12498,17 +12499,27 @@ select.NB-feed-folder-picker-select {
 
 .NB-media-player-play-pause:hover,
 .NB-media-player-skip-back:hover,
-.NB-media-player-skip-forward:hover {
+.NB-media-player-skip-forward:hover,
+.NB-media-player-next:hover {
     opacity: 1;
     background-color: rgba(0, 0, 0, 0.06);
 }
 
 .NB-media-player-play-pause svg,
 .NB-media-player-skip-back svg,
-.NB-media-player-skip-forward svg {
+.NB-media-player-skip-forward svg,
+.NB-media-player-next svg {
     width: 14px;
     height: 14px;
     fill: #404040;
+}
+
+/* reader.css: Next story (Listen only) dims when neither Up Next nor the list has another story. */
+.NB-media-player-next.NB-disabled,
+.NB-media-player-next.NB-disabled:hover {
+    opacity: 0.25;
+    cursor: default;
+    background-color: transparent;
 }
 
 .NB-media-player-play-pause svg {
