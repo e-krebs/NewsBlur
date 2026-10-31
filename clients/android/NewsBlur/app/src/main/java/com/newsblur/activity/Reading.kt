@@ -748,6 +748,13 @@ abstract class Reading :
     /** Reading.kt's stories in order, so Listen can continue with the next unread one when a story finishes. */
     fun listenQueue(): List<Story> = readingAdapter?.storiesSnapshot().orEmpty()
 
+    /**
+     * Whether Listen should continue down this list as sorted rather than to its next unread story: Saved Stories
+     * and Read Stories hold only read stories, so skipping reads would leave nothing to continue to
+     * (ListenAutoContinue.kt).
+     */
+    fun listenFollowsListOrder(): Boolean = fs?.let { it.isAllSaved || it.isSingleSavedTag || it.isAllRead } == true
+
     /** The feed or folder this reader shows, for Now Playing's "Then from …" (ListenNowPlayingSheet.kt). */
     fun listenQueueName(): String? =
         findViewById<android.widget.TextView>(R.id.toolbar_text)
