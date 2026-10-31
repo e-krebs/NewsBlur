@@ -38,7 +38,9 @@
 		745931734B2F7FA9728B5279 /* ListenPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CB18380DDF2AEDE93179A73 /* ListenPresenter.swift */; };
 		6F46773FF62C63B0470EBBB6 /* ListenPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CB18380DDF2AEDE93179A73 /* ListenPresenter.swift */; };
 		FA1B0C690362B703A1351042 /* ListenStoryBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE632736F37A4FAD85186170 /* ListenStoryBridge.swift */; };
+		2B28683687A1405DB12F91A0 /* ListenToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008F1687D2D0454CB281CD43 /* ListenToolbarButton.swift */; };
 		1970BB98F9EB9374B9E75C8A /* ListenStoryBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE632736F37A4FAD85186170 /* ListenStoryBridge.swift */; };
+		BEB7B86476C7493D8FADDE1F /* ListenToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008F1687D2D0454CB281CD43 /* ListenToolbarButton.swift */; };
 		9C2780F1363FAC9D299950F8 /* ListenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FFD99E29C40E7AEB5A6018 /* ListenTheme.swift */; };
 		082ADD705EFF265B3AA1EDE9 /* ListenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FFD99E29C40E7AEB5A6018 /* ListenTheme.swift */; };
 		EF756BF830CD4F0ACB262D4F /* ListenVoiceSettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C8FA5AAD9A01DF50310796 /* ListenVoiceSettingsModel.swift */; };
@@ -1797,6 +1799,7 @@
 		0CD78361C284D6051CEBC48F /* ListenPreferences.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenPreferences.swift; sourceTree = "<group>"; };
 		2CB18380DDF2AEDE93179A73 /* ListenPresenter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenPresenter.swift; sourceTree = "<group>"; };
 		BE632736F37A4FAD85186170 /* ListenStoryBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenStoryBridge.swift; sourceTree = "<group>"; };
+		008F1687D2D0454CB281CD43 /* ListenToolbarButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenToolbarButton.swift; sourceTree = "<group>"; };
 		E5FFD99E29C40E7AEB5A6018 /* ListenTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenTheme.swift; sourceTree = "<group>"; };
 		83C8FA5AAD9A01DF50310796 /* ListenVoiceSettingsModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenVoiceSettingsModel.swift; sourceTree = "<group>"; };
 		0C5133AA1F0C039546C4399E /* ListenVoiceSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListenVoiceSettingsView.swift; sourceTree = "<group>"; };
@@ -3003,6 +3006,7 @@
 				0CD78361C284D6051CEBC48F /* ListenPreferences.swift */,
 				2CB18380DDF2AEDE93179A73 /* ListenPresenter.swift */,
 				BE632736F37A4FAD85186170 /* ListenStoryBridge.swift */,
+				008F1687D2D0454CB281CD43 /* ListenToolbarButton.swift */,
 				E5FFD99E29C40E7AEB5A6018 /* ListenTheme.swift */,
 				83C8FA5AAD9A01DF50310796 /* ListenVoiceSettingsModel.swift */,
 				0C5133AA1F0C039546C4399E /* ListenVoiceSettingsView.swift */,
@@ -6136,6 +6140,7 @@
 				C3CEC194D9F951135614C1C4 /* ListenPreferences.swift in Sources */,
 				745931734B2F7FA9728B5279 /* ListenPresenter.swift in Sources */,
 				FA1B0C690362B703A1351042 /* ListenStoryBridge.swift in Sources */,
+				2B28683687A1405DB12F91A0 /* ListenToolbarButton.swift in Sources */,
 				9C2780F1363FAC9D299950F8 /* ListenTheme.swift in Sources */,
 				EF756BF830CD4F0ACB262D4F /* ListenVoiceSettingsModel.swift in Sources */,
 				511B697A0D8D2C65740505BE /* ListenVoiceSettingsView.swift in Sources */,
@@ -6424,6 +6429,7 @@
 				4C07A7524D803D6315FE050D /* ListenPreferences.swift in Sources */,
 				6F46773FF62C63B0470EBBB6 /* ListenPresenter.swift in Sources */,
 				1970BB98F9EB9374B9E75C8A /* ListenStoryBridge.swift in Sources */,
+				BEB7B86476C7493D8FADDE1F /* ListenToolbarButton.swift in Sources */,
 				082ADD705EFF265B3AA1EDE9 /* ListenTheme.swift in Sources */,
 				15B1FCF76776660785753A50 /* ListenVoiceSettingsModel.swift in Sources */,
 				9CE7B34B026FE9903FEE6E1E /* ListenVoiceSettingsView.swift in Sources */,
