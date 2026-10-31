@@ -77,7 +77,7 @@ final class ListenPlayer: NSObject, ObservableObject {
     private var isLoadingManifest = false
     private var pendingJumpParagraph: Int?
     /// Scrubbing and skips wait for the position to settle before asking for audio, since each segment requested
-    /// counts against the monthly allowance.
+    /// counts against the weekly allowance (apps/listen/usage.py).
     private var seekSettleWork: DispatchWorkItem?
     private var isSettlingSeek = false
     private var generation = 0
