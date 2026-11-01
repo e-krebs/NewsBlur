@@ -684,6 +684,17 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
         } else if ([action isEqualToString:@"VIEW_STORY_IDENTIFIER"] ||
                    [action isEqualToString:@"com.apple.UNNotificationDefaultActionIdentifier"]) {
             BOOL isDailyBriefing = [[content objectForKey:@"is_daily_briefing"] boolValue];
+#if TARGET_OS_MACCATALYST
+            if (!self.window) {
+                // NewsBlurAppDelegate.m waits for SceneDelegate.swift to replace the reader retained after Command-W.
+                self.pendingFolder = nil;
+                self.pendingNotificationStory = isDailyBriefing ? nil : @{@"feedId": feedIdStr, @"storyHash": storyHash ?: @""};
+                self.pendingDailyBriefingStoryHash = isDailyBriefing ?
+                    [DailyBriefingStartupDecision pendingStoryHashForStoryHash:storyHash] : nil;
+                if (completionHandler) completionHandler();
+                return;
+            }
+#endif
             if (isDailyBriefing) {
                 self.pendingNotificationStory = nil;
                 [self openDailyBriefingWithStoryHash:storyHash];
@@ -750,12 +761,10 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
     if (self.activeUsername && [url.scheme isEqualToString:@"newsblurwidget"]) {
         NSMutableDictionary *query = [NSMutableDictionary dictionary];
         
-        for (NSString *component in [url.query componentsSeparatedByString:@"&"]) {
-            NSArray *keyAndValue = [component componentsSeparatedByString:@"="];
-            
-            [query setObject:keyAndValue.lastObject forKey:keyAndValue.firstObject];
+        for (NSURLQueryItem *item in [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO].queryItems) {
+            if (item.name && item.value) query[item.name] = item.value;
         }
-        
+
         NSString *feedId = query[@"feedId"];
         NSString *storyHash = query[@"storyHash"];
         NSString *error = query[@"error"];
@@ -772,20 +781,9 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
             return NO;
         }
         
-        self.inFindingStoryMode = YES;
-        self.findingStoryStartDate = [NSDate date];
-        self.findingStoryDictionary = nil;
-        self.tryFeedStoryId = storyHash;
-        self.tryFeedFeedId = nil;
-        self.tryFeedStoryTitle = nil;
-        
-        [self.storiesCollection reset];
-        
-        storiesCollection.isSocialView = YES;
-        storiesCollection.activeFolder = @"widget_stories";
-        
-        [self reloadFeedsView:NO];
-        
+        // NewsBlurAppDelegate.m opens the story's actual feed independently of other widget selections.
+        [self loadFeed:feedId withStory:storyHash animated:NO];
+
         return YES;
     }
     
@@ -1164,6 +1162,7 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
                 appDelegate.cachedURL = nil;
                 if (![appDelegate.url isEqualToString:previousURL]) {
                     // NewsBlurAppDelegate.m cancels old-server requests before login accepts credentials again.
+                    [ListenStoryBridge stopForAccountChange];
                     [appDelegate clearNetworkManager];
                 }
             }];
@@ -1189,8 +1188,6 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
 }
 
 - (void)showKeyboardShortcuts {
-    [self hidePopover];
-
     if (@available(iOS 15.0, *)) {
         KeyboardShortcutsHostingController *shortcutsVC = [[KeyboardShortcutsHostingController alloc] init];
 
@@ -1201,8 +1198,11 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
             shortcutsVC.sheetPresentationController.preferredCornerRadius = 12.0;
         }
 
-        [feedsNavigationController presentViewController:shortcutsVC animated:YES completion:^{
-            [[ThemeManager themeManager] addThemeGestureRecognizerToView:shortcutsVC.view];
+        // NewsBlurAppDelegate.m waits for the story settings popover before presenting its shortcuts dialog.
+        [self hidePopoverAnimated:YES completion:^{
+            [self.navigationControllerForPopover presentViewController:shortcutsVC animated:YES completion:^{
+                [[ThemeManager themeManager] addThemeGestureRecognizerToView:shortcutsVC.view];
+            }];
         }];
     }
 }
@@ -1238,7 +1238,11 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
 }
 
 - (void)showWidgetSites {
-    [self showFeedChooserForOperation:FeedChooserOperationWidgetSites dashboardRiverId:nil];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:[NBLocalization text:@"Widgets"]
+        message:[NBLocalization text:@"Touch and hold a NewsBlur widget, or right-click it on Mac, then choose Edit Widget. Choose a folder or site for each widget."]
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:[NBLocalization text:@"OK"] style:UIAlertActionStyleDefault handler:nil]];
+    [self.splitViewController presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showDashboardSites:(NSString *)selectedRiverId {
@@ -1531,6 +1535,8 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
 
 - (void)showLogin {
     [self resetFeedSubscriptionForAccountChange];
+    // NewsBlurAppDelegate.m stops a story being read aloud so it can't carry over to the next account.
+    [ListenStoryBridge stopForAccountChange];
     [self.detailViewController resetDiscoveryForAccountChange];
     if (self.loginViewController.view.window != nil) {
         return;
@@ -2638,6 +2644,10 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
 }
 
 - (void)backgroundLoadNotificationStory {
+#if TARGET_OS_MACCATALYST
+    // NewsBlurAppDelegate.m preserves pending navigation when a late feed refresh finishes after the window closes.
+    if (!self.window) return;
+#endif
     NSString *startupFolder = [DailyBriefingStartupDecision startupFolderWithPendingStoryHash:self.pendingDailyBriefingStoryHash
                                                                                 pendingFolder:self.pendingFolder];
 
@@ -4153,6 +4163,8 @@ static NSString *NBNormalizedServerURLString(NSString *rawURLString) {
         }
     }
     
+    // NewsBlurAppDelegate.m updates traversal after the read count changes, including delayed and scroll reads.
+    [self.storyPagesViewController setNextPreviousButtons];
     [self.feedsViewController deferredReloadFeedTitlesTable];
     
     [self.storyPagesViewController reloadWidget];
