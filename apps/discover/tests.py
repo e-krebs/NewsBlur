@@ -26,7 +26,7 @@ class Test_DiscoverViews(TestCase):
 
 
 class Test_FeedAutocompleteUrlTerm(TestCase):
-    """A feed URL term answers that feed, then its host, and falls back to word matching."""
+    """A feed URL term answers that feed, then its site, and falls back to word matching."""
 
     def setUp(self):
         self.feed = Feed.objects.create(
@@ -41,12 +41,25 @@ class Test_FeedAutocompleteUrlTerm(TestCase):
             feed_title="Jules Notes",
             num_subscribers=40,
         )
+        self.subdomain = Feed.objects.create(
+            feed_address="https://feeds.julesblom.com/main",
+            feed_link="https://www.julesblom.com/",
+            feed_title="Jules Main",
+            num_subscribers=20,
+        )
+        self.hosted = Feed.objects.create(
+            feed_address="https://feeds.feedburner.com/julesblom",
+            feed_link="https://julesblom.com/",
+            feed_title="Jules via FeedBurner",
+            num_subscribers=10,
+        )
         self.other_host = Feed.objects.create(
             feed_address="https://example.com/julesblom.xml",
             feed_link="https://example.com/",
             feed_title="Jules Blom Fan Page",
             num_subscribers=900,
         )
+        self.site_search_ids = [self.other_host.pk, self.hosted.pk, self.subdomain.pk, self.sibling.pk]
 
     def _autocomplete(self, term, search_ids):
         with patch.object(Feed, "autocomplete", return_value=search_ids) as autocomplete:
@@ -55,19 +68,19 @@ class Test_FeedAutocompleteUrlTerm(TestCase):
         feeds = json.loads(response.content)["feeds"]
         return [feed["id"] for feed in feeds], autocomplete
 
-    def test_feed_url_term_answers_the_feed_then_its_host(self):
-        feed_ids, autocomplete = self._autocomplete(
-            "https://julesblom.com/rss.xml", [self.other_host.pk, self.sibling.pk]
-        )
+    def test_feed_url_term_answers_the_feed_then_its_site(self):
+        feed_ids, autocomplete = self._autocomplete("https://julesblom.com/rss.xml", self.site_search_ids)
 
-        self.assertEqual(feed_ids, [self.feed.pk, self.sibling.pk])
-        autocomplete.assert_called_once_with("julesblom.com", limit=20)
+        self.assertEqual(feed_ids, [self.feed.pk, self.sibling.pk, self.subdomain.pk, self.hosted.pk])
+        autocomplete.assert_called_once_with("julesblom.com", limit=20, semantic=False)
 
     def test_feed_url_term_forms(self):
         terms = [
             "julesblom.com/rss.xml",
             "JulesBlom.com/rss.xml",
+            "www.julesblom.com/rss.xml",
             "HTTPS://julesblom.com/rss.xml",
+            "https://www.julesblom.com/rss.xml",
             "feed://julesblom.com/rss.xml",
             "feed:https://julesblom.com/rss.xml",
             "//julesblom.com/rss.xml",
@@ -75,24 +88,34 @@ class Test_FeedAutocompleteUrlTerm(TestCase):
         ]
         for term in terms:
             with self.subTest(term=term):
-                feed_ids, _ = self._autocomplete(term, [])
+                feed_ids, autocomplete = self._autocomplete(term, [])
                 self.assertEqual(feed_ids, [self.feed.pk])
+                autocomplete.assert_called_once_with("julesblom.com", limit=20, semantic=False)
 
     def test_bare_host_and_non_http_terms_stay_name_searches(self):
         for term in ["julesblom.com", "node.js", "ftp://julesblom.com/rss.xml"]:
             with self.subTest(term=term):
-                feed_ids, _ = self._autocomplete(term, [self.other_host.pk])
+                feed_ids, autocomplete = self._autocomplete(term, [self.other_host.pk])
                 self.assertEqual(feed_ids, [self.other_host.pk])
+                autocomplete.assert_called_once()
+                self.assertNotIn("semantic", autocomplete.call_args.kwargs)
 
     def test_feed_url_term_matches_other_scheme_and_trailing_slash(self):
         feed_ids, _ = self._autocomplete("http://julesblom.com/rss.xml/", [])
 
         self.assertEqual(feed_ids, [self.feed.pk])
 
+    def test_site_url_term_answers_feeds_on_the_site(self):
+        feed_ids, autocomplete = self._autocomplete("https://www.julesblom.com/", self.site_search_ids)
+
+        self.assertEqual(feed_ids, [self.sibling.pk, self.subdomain.pk, self.hosted.pk])
+        autocomplete.assert_called_once_with("julesblom.com", limit=20, semantic=False)
+
     def test_feed_url_term_without_match_falls_back_to_word_matching(self):
         feed_ids, autocomplete = self._autocomplete("https://unknown.example/feed.xml", [self.other_host.pk])
 
         self.assertEqual(feed_ids, [self.other_host.pk])
+        autocomplete.assert_any_call("unknown.example", limit=20, semantic=False)
         autocomplete.assert_called_with("unknown.example feed.xml", limit=20)
 
     def test_name_term_keeps_word_matching(self):

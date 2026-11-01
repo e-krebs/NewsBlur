@@ -159,10 +159,12 @@ FEED_URL_HOST = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$",
 
 
 def _parse_feed_url_term(term):
-    """Return (hostname, address without scheme) when the term looks like a feed URL, else None.
+    """Return (hostname, rest) when the term looks like a feed URL, else None.
 
-    Accepts http(s):// in any case, feed://, feed:https://, scheme-relative //host/path and a bare
-    host/path. A bare term needs a path, so a name like "node.js" stays a name search.
+    The rest is everything after the hostname (port, path and query) without a trailing slash,
+    so the caller can rebuild the address under any scheme or host. Accepts http(s):// in any
+    case, feed://, feed:https://, scheme-relative //host/path and a bare host/path. A bare term
+    needs a path, so a name like "node.js" stays a name search.
     """
     term = re.sub(r"^feed:(?=//|https?:)", "", term.strip(), flags=re.IGNORECASE)
     if re.search(r"\s", term):
@@ -181,10 +183,65 @@ def _parse_feed_url_term(term):
         return None
     if not hostname or not (explicit or FEED_URL_HOST.match(hostname)):
         return None
-    address = (
-        hostname + (f":{port}" if port else "") + parts.path + (f"?{parts.query}" if parts.query else "")
+    rest = (f":{port}" if port else "") + parts.path + (f"?{parts.query}" if parts.query else "")
+    return hostname, rest.rstrip("/")
+
+
+def _strip_www(hostname):
+    return hostname[4:] if hostname.startswith("www.") else hostname
+
+
+def _site_host(url):
+    """Return the hostname of a URL without a leading www., or "" when it has none."""
+    try:
+        return _strip_www(urlparse(url).hostname or "")
+    except ValueError:
+        return ""
+
+
+def _on_site(url, site_host):
+    """True when the URL's host is site_host or one of its subdomains, ignoring a leading www."""
+    hostname = _site_host(url)
+    return hostname == site_host or hostname.endswith("." + site_host)
+
+
+def _feed_ids_for_url_term(hostname, rest, limit=20):
+    """Return (exact_feed_ids, feed_ids) for a feed URL term.
+
+    The feeds at that address come first, matched under either scheme, with or without www. and
+    a trailing slash. Then come the feeds on the same site: text search hits for the host whose
+    address or link is on that host or one of its subdomains, so a site's home page URL still
+    finds a feed served from feeds.example.com or FeedBurner.
+    """
+    site_host = _strip_www(hostname)
+    if not site_host:
+        return [], []
+    hosts = {hostname, site_host, f"www.{site_host}"}
+    addresses = [
+        f"{scheme}://{host}{rest}{slash}"
+        for scheme in ("https", "http")
+        for host in hosts
+        for slash in ("", "/")
+    ]
+    exact_feed_ids = list(
+        Feed.objects.filter(feed_address__in=addresses)
+        .order_by("-num_subscribers")
+        .values_list("pk", flat=True)[:limit]
     )
-    return hostname, address.rstrip("/")
+    # Only the text half of the search can match a hostname, so skip the semantic embedding.
+    search_ids = Feed.autocomplete(site_host, limit=limit, semantic=False)
+    urls_by_pk = {
+        pk: [url for url in (feed_address, feed_link) if url]
+        for pk, feed_address, feed_link in Feed.objects.filter(pk__in=search_ids).values_list(
+            "pk", "feed_address", "feed_link"
+        )
+    }
+    site_feed_ids = [
+        pk
+        for pk in search_ids
+        if pk not in exact_feed_ids and any(_on_site(url, site_host) for url in urls_by_pk.get(pk, []))
+    ]
+    return exact_feed_ids, (exact_feed_ids + site_feed_ids)[:limit]
 
 
 @json.json_view
@@ -198,31 +255,17 @@ def feed_autocomplete(request):
     if not query:
         return dict(code=-1, message=gettext("Specify a search 'term'."), feeds=[], term=query)
 
-    # A feed URL is answered by address, then by host, before any word matching.
-    url_host = None
+    # A feed URL is answered by address, then by site, before any word matching.
+    url_term = _parse_feed_url_term(query)
     exact_feed_ids = []
     feed_ids = []
-    url_host, bare_url = _parse_feed_url_term(query) or (None, None)
-    if url_host:
-        addresses = [f"{scheme}://{bare_url}{slash}" for scheme in ("https", "http") for slash in ("", "/")]
-        exact_feed_ids = list(
-            Feed.objects.filter(feed_address__in=addresses)
-            .order_by("-num_subscribers")
-            .values_list("pk", flat=True)[:20]
-        )
-        search_ids = Feed.autocomplete(url_host, limit=20)
-        addresses_by_pk = dict(Feed.objects.filter(pk__in=search_ids).values_list("pk", "feed_address"))
-        host_feed_ids = [
-            pk
-            for pk in search_ids
-            if pk not in exact_feed_ids and urlparse(addresses_by_pk.get(pk, "")).hostname == url_host
-        ]
-        feed_ids = (exact_feed_ids + host_feed_ids)[:20]
+    if url_term:
+        exact_feed_ids, feed_ids = _feed_ids_for_url_term(*url_term)
         if not feed_ids:
-            # Nothing matches the address or host: search the URL words like any other term.
-            url_host = None
+            # Nothing matches the address or its site: search the URL's words like any other term.
+            url_term = None
 
-    if "." in query and not url_host:
+    if "." in query and not url_term:
         try:
             parts = urlparse(query)
             if not parts.hostname and not query.startswith("http"):
@@ -234,7 +277,7 @@ def feed_autocomplete(request):
         except Exception:
             logging.user(request, "~FGAdd search, could not parse url in ~FR%s" % query)
 
-    query_params = [] if url_host else query.split(" ")
+    query_params = [] if url_term else query.split(" ")
     tries_left = 5
     while len(query_params) and tries_left:
         tries_left -= 1
@@ -246,7 +289,7 @@ def feed_autocomplete(request):
             query_params = query_params[:-1]
 
     # Fallback to database search if Elasticsearch returns no results
-    if not feed_ids and not url_host:
+    if not feed_ids and not url_term:
         from django.db.models import Q
 
         search_query = query.split()[0] if query.split() else query
@@ -309,10 +352,11 @@ def feed_autocomplete(request):
 
     logging.user(
         request,
-        "~FGAdd Search: ~SB%s ~SN(%s matches)"
+        "~FGAdd Search: ~SB%s ~SN(%s matches%s)"
         % (
             query,
             len(feeds),
+            ", by url" if url_term else "",
         ),
     )
 
